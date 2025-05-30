@@ -165,7 +165,7 @@ function App() {
                 value={examInfo.round}
                 onChange={(e) => {
                   const value = parseInt(e.target.value);
-                  if (value > 0) {
+                  if (value >= 0) {
                     setExamInfo({ ...examInfo, round: value });
                   }
                 }}
