@@ -20,12 +20,17 @@ function App() {
   const [activeStep, setActiveStep] = useState(0);
   const [examInfo, setExamInfo] = useState<{
     exam_name: string;
-    round: number | null;
+    round: number;
   }>({
     exam_name: '',
     round: 1
   });
   const [studentScores, setStudentScores] = useState<{ [key: string]: number | '' }>({});
+  const [password, setPassword] = useState('');
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState<{ [key: string]: boolean }>(
+    STUDENT_LIST.reduce((acc, student) => ({ ...acc, [student]: true }), {})
+  );
 
   useEffect(() => {
     fetchScores();
@@ -54,13 +59,34 @@ function App() {
 
   const handleNext = () => {
     if (activeStep === 0) {
-      if (!examInfo.exam_name || examInfo.round === null || examInfo.round < 1) {
-        setError('모의고사 이름과 회차를 입력해주세요.');
+      if (password !== process.env.REACT_APP_PASSWORD) {
+        setError('비밀번호가 일치하지 않습니다.');
         return;
       }
+      setIsPasswordVerified(true);
       setError(null);
+      setActiveStep(1);
+    } else if (activeStep === 1) {
+      if (!examInfo.exam_name) {
+        setError('모의고사 이름을 입력해주세요.');
+        return;
+      }
+      
+      // 전체 모의고사의 가장 최근 회차 찾기
+      const maxRound = scores.length > 0 
+        ? Math.max(...scores.map(score => score.round))
+        : 0;
+      console.log('전체 최대 회차:', maxRound);
+      
+      // 다음 회차 설정
+      setExamInfo(prev => ({
+        ...prev,
+        round: maxRound + 1
+      }));
+      setError(null);
+      setStudentScores({}); // 학생 점수 초기화
+      setActiveStep(2); // 점수 입력 단계로 이동
     }
-    setActiveStep((prevStep) => prevStep + 1);
   };
 
   const handleBack = () => {
@@ -69,6 +95,8 @@ function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (activeStep !== 2) return; // 점수 입력 단계가 아니면 제출하지 않음
+
     try {
       // 점수가 입력된 학생만 필터링하고 유효한 점수만 포함
       const scoresToInsert = STUDENT_LIST
@@ -88,6 +116,8 @@ function App() {
         return;
       }
 
+      console.log('저장할 점수:', scoresToInsert);
+
       const { error } = await supabase
         .from('exam_scores')
         .insert(scoresToInsert);
@@ -96,12 +126,15 @@ function App() {
         console.error('Error inserting scores:', error);
         setError('성적을 저장하는 중 오류가 발생했습니다.');
       } else {
+        // 저장 성공 후 상태 초기화
         setExamInfo({
           exam_name: '',
           round: 1
         });
         setStudentScores({});
         setActiveStep(0);
+        setIsPasswordVerified(false);
+        setPassword('');
         await fetchScores();
         setError(null);
       }
@@ -128,7 +161,14 @@ function App() {
     });
   };
 
-  const steps = ['모의고사 정보 입력', '학생별 점수 입력'];
+  const steps = ['비밀번호 확인', '모의고사 정보 입력', '학생별 점수 입력'];
+
+  const toggleStudent = (student: string) => {
+    setSelectedStudents(prev => ({
+      ...prev,
+      [student]: !prev[student]
+    }));
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -153,6 +193,23 @@ function App() {
 
         <Box component="form" onSubmit={handleSubmit}>
           {activeStep === 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="비밀번호"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                fullWidth
+              />
+              <Button
+                variant="contained"
+                onClick={handleNext}
+                sx={{ minWidth: 120 }}
+              >
+                다음
+              </Button>
+            </Box>
+          ) : activeStep === 1 ? (
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
               <TextField
                 label="모의고사 이름"
@@ -162,36 +219,28 @@ function App() {
                 fullWidth
                 sx={{ mb: 2 }}
               />
-              <TextField
-                label="회차"
-                type="number"
-                value={examInfo.round === null ? "" : examInfo.round}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === "") {
-                    setExamInfo({ ...examInfo, round: null });
-                  } else {
-                    const num = parseInt(value, 10);
-                    if (!isNaN(num) && num >= 0) {
-                      setExamInfo({ ...examInfo, round: num });
-                    }
-                  }
-                }}
-                inputProps={{ min: 1, step: 1 }}
-                sx={{ mb: 2 }}
-              />
-
-
-              <Button
-                variant="contained"
-                onClick={handleNext}
-                sx={{ minWidth: 120 }}
-              >
-                다음
-              </Button>
+              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleBack}
+                  sx={{ minWidth: 120 }}
+                >
+                  이전
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleNext}
+                  sx={{ minWidth: 120 }}
+                >
+                  다음
+                </Button>
+              </Box>
             </Box>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                {examInfo.exam_name} {examInfo.round}회차 점수 입력
+              </Typography>
               {STUDENT_LIST.map((student) => (
                 <TextField
                   key={student}
@@ -233,6 +282,30 @@ function App() {
         <Typography variant="h6" gutterBottom>
           성적 추이 그래프
         </Typography>
+        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {STUDENT_LIST.map((student) => (
+            <Button
+              key={student}
+              variant={selectedStudents[student] ? "contained" : "outlined"}
+              onClick={() => toggleStudent(student)}
+              size="small"
+              sx={{
+                minWidth: 'auto',
+                px: 2,
+                backgroundColor: selectedStudents[student] 
+                  ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`
+                  : 'transparent',
+                '&:hover': {
+                  backgroundColor: selectedStudents[student]
+                    ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 40%)`
+                    : 'rgba(0, 0, 0, 0.04)'
+                }
+              }}
+            >
+              {student}
+            </Button>
+          ))}
+        </Box>
         <div style={{ width: '100%', height: 400 }}>
           <ResponsiveContainer>
             <LineChart>
@@ -243,11 +316,14 @@ function App() {
                 domain={['dataMin', 'dataMax']}
                 tickCount={10}
                 allowDecimals={false}
+                interval={0}
               />
               <YAxis 
                 domain={[0, 100]} 
                 tickCount={11}
                 allowDecimals={false}
+                interval={0}
+                ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
               />
               <Tooltip 
                 formatter={(value, name, props) => {
@@ -257,6 +333,7 @@ function App() {
               />
               <Legend />
               {STUDENT_LIST.map((student, index) => {
+                if (!selectedStudents[student]) return null;
                 const studentData = getStudentData(student);
                 return studentData.length > 0 ? (
                   <Line
