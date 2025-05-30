@@ -18,7 +18,10 @@ function App() {
   const [scores, setScores] = useState<ExamScore[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
-  const [examInfo, setExamInfo] = useState({
+  const [examInfo, setExamInfo] = useState<{
+    exam_name: string;
+    round: number | null;
+  }>({
     exam_name: '',
     round: 1
   });
@@ -51,7 +54,7 @@ function App() {
 
   const handleNext = () => {
     if (activeStep === 0) {
-      if (!examInfo.exam_name || examInfo.round < 1) {
+      if (!examInfo.exam_name || examInfo.round === null || examInfo.round < 1) {
         setError('모의고사 이름과 회차를 입력해주세요.');
         return;
       }
@@ -162,16 +165,23 @@ function App() {
               <TextField
                 label="회차"
                 type="number"
-                value={examInfo.round}
+                value={examInfo.round === null ? "" : examInfo.round}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  if (value >= 0) {
-                    setExamInfo({ ...examInfo, round: value });
+                  const value = e.target.value;
+                  if (value === "") {
+                    setExamInfo({ ...examInfo, round: null });
+                  } else {
+                    const num = parseInt(value, 10);
+                    if (!isNaN(num) && num >= 0) {
+                      setExamInfo({ ...examInfo, round: num });
+                    }
                   }
                 }}
                 inputProps={{ min: 1, step: 1 }}
                 sx={{ mb: 2 }}
               />
+
+
               <Button
                 variant="contained"
                 onClick={handleNext}
