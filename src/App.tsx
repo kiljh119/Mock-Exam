@@ -179,11 +179,26 @@ function App() {
       const roundScores = scores.filter(score => score.round === round);
       const examName = roundScores[0]?.exam_name || '';
       
+      // 점수별로 그룹화하여 등수 계산
       const sortedScores = [...roundScores].sort((a, b) => b.score - a.score);
-      const rankings = sortedScores.map((score, index) => ({
-        ...score,
-        rank: index + 1
-      }));
+      let currentRank = 1;
+      let currentScore = sortedScores[0]?.score;
+      let skipCount = 0;
+      
+      const rankings = sortedScores.map((score, index) => {
+        if (index > 0 && score.score < currentScore) {
+          currentRank += skipCount + 1;
+          skipCount = 0;
+          currentScore = score.score;
+        } else if (index > 0 && score.score === currentScore) {
+          skipCount++;
+        }
+        
+        return {
+          ...score,
+          rank: currentRank
+        };
+      });
 
       return {
         round,
