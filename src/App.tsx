@@ -169,7 +169,6 @@ function App() {
                     setExamInfo({ ...examInfo, round: value });
                   }
                 }}
-                required
                 inputProps={{ min: 1, step: 1 }}
                 sx={{ mb: 2 }}
               />
