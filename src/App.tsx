@@ -1012,21 +1012,19 @@ function App() {
 
       if (error) throw error;
 
-      for (const { subscription } of subscriptions) {
-        await fetch('/api/send-notification', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+      // Supabase Edge Function 호출
+      const { error: notificationError } = await supabase.functions.invoke('send-notification', {
+        body: {
+          subscriptions,
+          payload: {
+            title,
+            body,
           },
-          body: JSON.stringify({
-            subscription,
-            payload: {
-              title,
-              body,
-            },
-          }),
-        });
-      }
+        },
+      });
+
+      if (notificationError) throw notificationError;
+      console.log('알림 전송 성공');
     } catch (error) {
       console.error('알림 전송 중 오류 발생:', error);
     }
