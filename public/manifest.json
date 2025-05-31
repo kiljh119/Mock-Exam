@@ -1,11 +1,11 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "모의고사 추적",
+  "name": "모의고사 성적 추적 시스템",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💯</text></svg>",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "type": "image/svg+xml"
     },
     {
       "src": "logo192.png",
@@ -20,6 +20,10 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#1a237e",
+  "background_color": "#f5f7fa",
+  "orientation": "portrait",
+  "description": "모의고사 성적을 추적하고 분석하는 서비스입니다.",
+  "dir": "ltr",
+  "lang": "ko-KR"
 }
