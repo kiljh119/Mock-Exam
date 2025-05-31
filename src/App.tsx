@@ -1,21 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Container, Typography, TextField, Button, Box, Paper, Alert, Select, MenuItem, FormControl, InputLabel, Stepper, Step, StepLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { supabase } from './supabaseClient';
 
 interface ExamScore {
   id: number;
+  exam_id: number;
+  student_id: number;
+  score: number;
+  created_at: string;
+}
+
+interface Exam {
+  id: number;
   exam_name: string;
   round: number;
-  score: number;
+  created_at: string;
+}
+
+interface Student {
+  id: number;
   student_name: string;
   created_at: string;
+}
+
+interface ScoreWithDetails extends ExamScore {
+  exam: Exam;
+  student: Student;
 }
 
 const STUDENT_LIST = ['길준혁', '박시혁', '엄윤서', '정하승'];
 
 function App() {
   const [scores, setScores] = useState<ExamScore[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
   const [examInfo, setExamInfo] = useState<{
@@ -33,28 +52,53 @@ function App() {
   );
   const [selectedRound, setSelectedRound] = useState<number | 'all'>('all');
 
+  const getScoresWithDetails = useCallback(() => {
+    return scores.map(score => {
+      const exam = exams.find(e => e.id === score.exam_id);
+      const student = students.find(s => s.id === score.student_id);
+      return {
+        ...score,
+        exam: exam!,
+        student: student!
+      };
+    });
+  }, [scores, exams, students]);
+
   useEffect(() => {
-    fetchScores();
+    fetchData();
   }, []);
 
-  const fetchScores = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('exam_scores')
+      // 학생 데이터 가져오기
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select('*');
+
+      if (studentsError) throw studentsError;
+      setStudents(studentsData || []);
+
+      // 모의고사 데이터 가져오기
+      const { data: examsData, error: examsError } = await supabase
+        .from('exams')
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching scores:', error);
-        setError('성적을 불러오는 중 오류가 발생했습니다.');
-      } else {
-        console.log('Fetched scores:', data);
-        setScores(data || []);
-        setError(null);
-      }
+      if (examsError) throw examsError;
+      setExams(examsData || []);
+
+      // 성적 데이터 가져오기
+      const { data: scoresData, error: scoresError } = await supabase
+        .from('exam_scores_normalized')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (scoresError) throw scoresError;
+      setScores(scoresData || []);
+      setError(null);
     } catch (err) {
-      console.error('Unexpected error:', err);
-      setError('예기치 않은 오류가 발생했습니다.');
+      console.error('Error fetching data:', err);
+      setError('데이터를 불러오는 중 오류가 발생했습니다.');
     }
   };
 
@@ -74,8 +118,8 @@ function App() {
       }
       
       // 전체 모의고사의 가장 최근 회차 찾기
-      const maxRound = scores.length > 0 
-        ? Math.max(...scores.map(score => score.round))
+      const maxRound = exams.length > 0 
+        ? Math.max(...exams.map(exam => exam.round))
         : 0;
       console.log('전체 최대 회차:', maxRound);
       
@@ -96,88 +140,74 @@ function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (activeStep !== 2) return; // 점수 입력 단계가 아니면 제출하지 않음
+    if (activeStep !== 2) return;
 
     try {
-      // 점수가 입력된 학생만 필터링하고 유효한 점수만 포함
+      // 1. 모의고사 정보 저장
+      const { data: examData, error: examError } = await supabase
+        .from('exams')
+        .insert({
+          exam_name: examInfo.exam_name,
+          round: examInfo.round
+        })
+        .select()
+        .single();
+
+      if (examError) throw examError;
+
+      // 2. 학생 점수 저장
       const scoresToInsert = STUDENT_LIST
         .filter(student => {
           const score = studentScores[student];
           return score !== '' && score !== undefined && score >= 0 && score <= 100;
         })
-        .map(student => ({
-          exam_name: examInfo.exam_name,
-          round: examInfo.round,
-          score: studentScores[student] as number,
-          student_name: student
-        }));
+        .map(student => {
+          const studentData = students.find(s => s.student_name === student);
+          if (!studentData) throw new Error(`학생 정보를 찾을 수 없습니다: ${student}`);
+          
+          return {
+            exam_id: examData.id,
+            student_id: studentData.id,
+            score: studentScores[student] as number
+          };
+        });
 
       if (scoresToInsert.length === 0) {
         setError('최소 한 명 이상의 학생 점수를 입력해주세요.');
         return;
       }
 
-      console.log('저장할 점수:', scoresToInsert);
-
-      const { error } = await supabase
-        .from('exam_scores')
+      const { error: scoresError } = await supabase
+        .from('exam_scores_normalized')
         .insert(scoresToInsert);
 
-      if (error) {
-        console.error('Error inserting scores:', error);
-        setError('성적을 저장하는 중 오류가 발생했습니다.');
-      } else {
-        // 저장 성공 후 상태 초기화
-        setExamInfo({
-          exam_name: '',
-          round: 1
-        });
-        setStudentScores({});
-        setActiveStep(0);
-        setIsPasswordVerified(false);
-        setPassword('');
-        await fetchScores();
-        setError(null);
-      }
+      if (scoresError) throw scoresError;
+
+      // 저장 성공 후 상태 초기화
+      setExamInfo({
+        exam_name: '',
+        round: 1
+      });
+      setStudentScores({});
+      setActiveStep(0);
+      setIsPasswordVerified(false);
+      setPassword('');
+      await fetchData();
+      setError(null);
     } catch (err) {
-      console.error('Unexpected error:', err);
-      setError('예기치 않은 오류가 발생했습니다.');
+      console.error('Error inserting data:', err);
+      setError('데이터를 저장하는 중 오류가 발생했습니다.');
     }
   };
 
-  const getStudentData = (studentName: string) => {
-    const studentScores = scores.filter(score => score.student_name === studentName);
-    if (studentScores.length === 0) return [];
-
-    // 모든 회차에 대한 데이터 생성
-    const allRounds = Array.from(new Set(scores.map(score => score.round))).sort((a, b) => a - b);
-    
-    return allRounds.map(round => {
-      const score = studentScores.find(s => s.round === round);
-      return {
-        round,
-        score: score ? score.score : null,
-        exam_name: score ? score.exam_name : '미응시'
-      };
-    });
-  };
-
-  const steps = ['비밀번호 확인', '모의고사 정보 입력', '학생별 점수 입력'];
-
-  const toggleStudent = (student: string) => {
-    setSelectedStudents(prev => ({
-      ...prev,
-      [student]: !prev[student]
-    }));
-  };
-
   const getRankingsByRound = () => {
-    const rounds = Array.from(new Set(scores.map(score => score.round))).sort((a, b) => a - b);
+    const scoresWithDetails = getScoresWithDetails();
+    const rounds = Array.from(new Set(exams.map(exam => exam.round))).sort((a, b) => a - b);
     const filteredRounds = selectedRound === 'all' ? rounds : [selectedRound];
     
     return filteredRounds.map(round => {
-      const roundScores = scores.filter(score => score.round === round);
-      const examName = roundScores[0]?.exam_name || '';
+      const exam = exams.find(e => e.round === round);
+      const roundScores = scoresWithDetails.filter(score => score.exam.round === round);
       
       // 점수별로 그룹화하여 등수 계산
       const sortedScores = [...roundScores].sort((a, b) => b.score - a.score);
@@ -202,11 +232,131 @@ function App() {
 
       return {
         round,
-        examName,
+        examName: exam?.exam_name || '',
         rankings
       };
     });
   };
+
+  const getStudentData = React.useCallback((studentName: string) => {
+    const student = students.find(s => s.student_name === studentName);
+    if (!student) return [];
+
+    const scoresWithDetails = getScoresWithDetails();
+    const studentScores = scoresWithDetails.filter(score => score.student.student_name === studentName);
+    if (studentScores.length === 0) return [];
+
+    // 모든 회차에 대한 데이터 생성
+    const allRounds = Array.from(new Set(exams.map(exam => exam.round))).sort((a, b) => a - b);
+    
+    return allRounds.map(round => {
+      const exam = exams.find(e => e.round === round);
+      if (!exam) return null;
+
+      const score = studentScores.find(s => s.exam.round === round);
+
+      return {
+        round,
+        score: score ? score.score : null,
+        exam_name: exam.exam_name
+      };
+    }).filter(Boolean);
+  }, [scores, exams, students, getScoresWithDetails]);
+
+  const steps = ['비밀번호 확인', '모의고사 정보 입력', '학생별 점수 입력'];
+
+  const toggleStudent = (student: string) => {
+    setSelectedStudents(prev => ({
+      ...prev,
+      [student]: !prev[student]
+    }));
+  };
+
+  const GraphComponent = React.memo(({ selectedStudents, scores }: { selectedStudents: { [key: string]: boolean }, scores: ExamScore[] }) => {
+    const scoresWithDetails = getScoresWithDetails();
+    const studentDataMap = React.useMemo(() => {
+      return STUDENT_LIST.reduce((acc, student) => {
+        if (selectedStudents[student]) {
+          const studentScores = scoresWithDetails.filter(score => score.student.student_name === student);
+          if (studentScores.length > 0) {
+            const allRounds = Array.from(new Set(exams.map(exam => exam.round))).sort((a, b) => a - b);
+            acc[student] = allRounds.map(round => {
+              const exam = exams.find(e => e.round === round);
+              const score = studentScores.find(s => s.exam.round === round);
+              return {
+                round,
+                score: score ? score.score : null,
+                exam_name: exam ? exam.exam_name : '미응시'
+              };
+            });
+          }
+        }
+        return acc;
+      }, {} as { [key: string]: any[] });
+    }, [selectedStudents, scoresWithDetails, exams]);
+
+    return (
+      <div style={{ width: '100%', height: 400 }}>
+        <ResponsiveContainer>
+          <LineChart>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="round" 
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              tickCount={10}
+              allowDecimals={false}
+              interval={0}
+              stroke="#666"
+            />
+            <YAxis 
+              domain={[0, 100]} 
+              tickCount={11}
+              allowDecimals={false}
+              interval={0}
+              ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+              stroke="#666"
+            />
+            <Tooltip 
+              formatter={(value, name, props) => {
+                if (value === null) return ['미응시', `${name}`];
+                return [`${value}점`, `${name} (${props.payload.exam_name})`];
+              }}
+              contentStyle={{
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                backdropFilter: 'blur(10px)',
+                border: 'none',
+                borderRadius: 8,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+              }}
+            />
+            <Legend />
+            {STUDENT_LIST.map((student, index) => {
+              if (!selectedStudents[student] || !studentDataMap[student]) return null;
+              return (
+                <Line
+                  key={student}
+                  type="monotone"
+                  dataKey="score"
+                  data={studentDataMap[student]}
+                  name={student}
+                  stroke={`hsl(${index * 360 / STUDENT_LIST.length}, 70%, 50%)`}
+                  strokeWidth={2}
+                  dot={{ r: 4, strokeWidth: 2 }}
+                  activeDot={{ r: 6, strokeWidth: 2 }}
+                  connectNulls={false}
+                  animationDuration={300}
+                  animationBegin={0}
+                  animationEasing="ease-out"
+                  isAnimationActive={true}
+                />
+              );
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  });
 
   return (
     <Container 
@@ -558,7 +708,7 @@ function App() {
               }}
             >
               <MenuItem value="all">전체 회차</MenuItem>
-              {Array.from(new Set(scores.map(score => score.round)))
+              {Array.from(new Set(exams.map(exam => exam.round)))
                 .sort((a, b) => a - b)
                 .map(round => (
                   <MenuItem key={round} value={round}>
@@ -669,7 +819,7 @@ function App() {
                     {examName}
                   </TableCell>
                   {STUDENT_LIST.map((student, index) => {
-                    const studentRanking = rankings.find(r => r.student_name === student);
+                    const studentRanking = rankings.find(r => r.student.student_name === student);
                     return (
                       <TableCell 
                         key={student}
@@ -808,63 +958,7 @@ function App() {
             </Button>
           ))}
         </Box>
-        <div style={{ width: '100%', height: 400 }}>
-          <ResponsiveContainer>
-            <LineChart>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-              <XAxis 
-                dataKey="round" 
-                type="number"
-                domain={['dataMin', 'dataMax']}
-                tickCount={10}
-                allowDecimals={false}
-                interval={0}
-                stroke="#666"
-              />
-              <YAxis 
-                domain={[0, 100]} 
-                tickCount={11}
-                allowDecimals={false}
-                interval={0}
-                ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
-                stroke="#666"
-              />
-              <Tooltip 
-                formatter={(value, name, props) => {
-                  if (value === null) return ['미응시', `${name}`];
-                  return [`${value}점`, `${name} (${props.payload.exam_name})`];
-                }}
-                contentStyle={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  backdropFilter: 'blur(10px)',
-                  border: 'none',
-                  borderRadius: 8,
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                }}
-              />
-              <Legend />
-              {STUDENT_LIST.map((student, index) => {
-                if (!selectedStudents[student]) return null;
-                const studentData = getStudentData(student);
-                return studentData.length > 0 ? (
-                  <Line
-                    key={student}
-                    type="monotone"
-                    dataKey="score"
-                    data={studentData}
-                    name={student}
-                    stroke={`hsl(${index * 360 / STUDENT_LIST.length}, 70%, 50%)`}
-                    strokeWidth={2}
-                    dot={{ r: 4, strokeWidth: 2 }}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    connectNulls={false}
-                    animationDuration={1000}
-                  />
-                ) : null;
-              })}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <GraphComponent selectedStudents={selectedStudents} scores={scores} />
       </Paper>
     </Container>
   );
