@@ -122,7 +122,7 @@ self.addEventListener('push', (event: any) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('모의고사 성적 추적', options)
+    self.registration.showNotification('우최실', options)
   );
 });
 

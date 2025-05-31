@@ -2480,7 +2480,7 @@ function App() {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            모의고사 성적 추적
+            우최실
           </Typography>
           <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
             {!isMobile && (
