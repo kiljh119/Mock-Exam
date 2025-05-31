@@ -961,15 +961,74 @@ function App() {
 
   const requestNotificationPermission = async () => {
     try {
+      // 서비스 워커 등록
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('Service Worker 등록 성공:', registration);
+      }
+
+      // 알림 권한 요청
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
       
       if (permission === 'granted') {
-        await navigator.serviceWorker.ready;
+        // 알림 권한이 허용되면 서비스 워커가 준비될 때까지 대기
+        const registration = await navigator.serviceWorker.ready;
+        
+        // 구독 정보 가져오기
+        const subscription = await registration.pushManager.getSubscription();
+        
+        if (!subscription) {
+          // 구독이 없으면 새로 생성
+          const newSubscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: process.env.REACT_APP_VAPID_PUBLIC_KEY
+          });
+          
+          // 구독 정보를 서버에 저장
+          const { error } = await supabase
+            .from('push_subscriptions')
+            .insert({
+              subscription: newSubscription,
+              user_agent: navigator.userAgent
+            });
+            
+          if (error) throw error;
+        }
+        
         console.log('알림 권한이 허용되었습니다.');
       }
     } catch (error) {
       console.error('알림 권한 요청 중 오류 발생:', error);
+      setError('알림 권한을 요청하는 중 오류가 발생했습니다.');
+    }
+  };
+
+  const sendNotification = async (title: string, body: string) => {
+    try {
+      const { data: subscriptions, error } = await supabase
+        .from('push_subscriptions')
+        .select('subscription');
+
+      if (error) throw error;
+
+      for (const { subscription } of subscriptions) {
+        await fetch('/api/send-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            subscription,
+            payload: {
+              title,
+              body,
+            },
+          }),
+        });
+      }
+    } catch (error) {
+      console.error('알림 전송 중 오류 발생:', error);
     }
   };
 
@@ -1021,16 +1080,11 @@ function App() {
       if (newSchedule.files.length > 0) {
         for (const file of newSchedule.files) {
           try {
-            // 파일 이름에서 확장자 추출
             const fileExtension = file.name.split('.').pop();
-            // 현재 시간을 밀리초로 변환하여 고유한 파일 이름 생성
             const timestamp = Date.now();
-            // 안전한 파일 이름 생성 (영문, 숫자만 사용)
             const safeFileName = `file_${timestamp}.${fileExtension}`;
-            // 파일 경로 생성
             const filePath = `${scheduleData.id}/${safeFileName}`;
 
-            // 파일 업로드
             const { error: uploadError } = await supabase.storage
               .from('exam-files')
               .upload(filePath, file, {
@@ -1038,12 +1092,8 @@ function App() {
                 upsert: false
               });
 
-            if (uploadError) {
-              console.error('File upload error:', uploadError);
-              throw new Error(`파일 업로드 실패: ${uploadError.message}`);
-            }
+            if (uploadError) throw uploadError;
 
-            // 파일 메타데이터 저장
             const { error: fileMetadataError } = await supabase
               .from('schedule_files')
               .insert({
@@ -1055,16 +1105,27 @@ function App() {
                 uploaded_by: 'admin'
               });
 
-            if (fileMetadataError) {
-              console.error('File metadata error:', fileMetadataError);
-              throw new Error(`파일 메타데이터 저장 실패: ${fileMetadataError.message}`);
-            }
+            if (fileMetadataError) throw fileMetadataError;
           } catch (err) {
             console.error('Error uploading file:', err);
             throw new Error(`파일 업로드 중 오류 발생: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
           }
         }
       }
+
+      // 4. 알림 전송
+      const examDate = new Date(newSchedule.exam_date);
+      const formattedDate = examDate.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
+      
+      await sendNotification(
+        '새로운 모의고사 일정이 등록되었습니다',
+        `${newSchedule.exam_name} - ${formattedDate}`
+      );
 
       // 저장 성공 후 상태 초기화
       setNewSchedule({
@@ -2514,7 +2575,7 @@ function App() {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            모의고사 성적 추적
+            우최실
           </Typography>
           <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
             {!isMobile && (
@@ -2528,7 +2589,7 @@ function App() {
                   }
                 }}
               >
-                일정 등록
+                일정
               </Button>
             )}
             {notificationPermission !== 'granted' && (
