@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Container, Typography, TextField, Button, Box, Paper, Alert, Select, MenuItem, FormControl, InputLabel, Stepper, Step, StepLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Container, Typography, TextField, Button, Box, Paper, Alert, Select, MenuItem, FormControl, InputLabel, Stepper, Step, StepLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, AppBar, Toolbar, IconButton, Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, useMediaQuery, useTheme, Grid } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
 import { supabase } from './supabaseClient';
 
 interface ExamScore {
@@ -32,6 +36,10 @@ interface ScoreWithDetails extends ExamScore {
 const STUDENT_LIST = ['길준혁', '박시혁', '엄윤서', '정하승'];
 
 function App() {
+  const theme = useTheme();
+  const [isMobile, setIsMobile] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'score' | 'rank' | 'graph'>('score');
   const [scores, setScores] = useState<ExamScore[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -51,6 +59,18 @@ function App() {
     STUDENT_LIST.reduce((acc, student) => ({ ...acc, [student]: true }), {})
   );
   const [selectedRound, setSelectedRound] = useState<number | 'all'>('all');
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      setIsMobile(isMobileDevice);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const getScoresWithDetails = useCallback(() => {
     return scores.map(score => {
@@ -358,211 +378,134 @@ function App() {
     );
   });
 
-  return (
-    <Container 
-      maxWidth="lg" 
-      sx={{ 
-        py: 4,
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%)',
-        minHeight: '100vh'
+  const handleDrawerToggle = () => {
+    setDrawerOpen(!drawerOpen);
+  };
+
+  const handleViewChange = (view: 'score' | 'rank' | 'graph') => {
+    setActiveView(view);
+    if (isMobile) {
+      setDrawerOpen(false);
+    }
+  };
+
+  const renderDrawer = () => (
+    <Drawer
+      variant={isMobile ? "temporary" : "permanent"}
+      open={isMobile ? drawerOpen : true}
+      onClose={handleDrawerToggle}
+      sx={{
+        width: 240,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: 240,
+          boxSizing: 'border-box',
+          background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%)',
+          borderRight: 'none',
+        },
       }}
     >
-      <Typography 
-        variant="h4" 
-        component="h1" 
-        gutterBottom 
-        align="center"
-        sx={{ 
-          fontWeight: 800,
-          background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-          backgroundClip: 'text',
-          textFillColor: 'transparent',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          mb: 4,
-          textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
-        }}
-      >
-        모의고사 성적 추적
-      </Typography>
-
-      {error && (
-        <Alert 
-          severity="error" 
-          sx={{ 
-            mb: 3,
-            borderRadius: 3,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            animation: 'slideIn 0.3s ease-out',
-            '@keyframes slideIn': {
-              '0%': {
-                transform: 'translateY(-20px)',
-                opacity: 0
+      <Toolbar />
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton 
+            onClick={() => handleViewChange('score')}
+            selected={activeView === 'score'}
+            sx={{
+              '&.Mui-selected': {
+                background: 'rgba(26, 35, 126, 0.1)',
+                '&:hover': {
+                  background: 'rgba(26, 35, 126, 0.2)',
+                },
               },
-              '100%': {
-                transform: 'translateY(0)',
-                opacity: 1
-              }
-            }
-          }}
-        >
-          {error}
-        </Alert>
-      )}
+            }}
+          >
+            <ListItemIcon>
+              <AddCircleIcon color={activeView === 'score' ? 'primary' : 'inherit'} />
+            </ListItemIcon>
+            <ListItemText 
+              primary="점수 등록" 
+              primaryTypographyProps={{
+                color: activeView === 'score' ? 'primary' : 'inherit',
+                fontWeight: activeView === 'score' ? 'bold' : 'normal',
+              }}
+            />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton 
+            onClick={() => handleViewChange('rank')}
+            selected={activeView === 'rank'}
+            sx={{
+              '&.Mui-selected': {
+                background: 'rgba(26, 35, 126, 0.1)',
+                '&:hover': {
+                  background: 'rgba(26, 35, 126, 0.2)',
+                },
+              },
+            }}
+          >
+            <ListItemIcon>
+              <EmojiEventsIcon color={activeView === 'rank' ? 'primary' : 'inherit'} />
+            </ListItemIcon>
+            <ListItemText 
+              primary="순위" 
+              primaryTypographyProps={{
+                color: activeView === 'rank' ? 'primary' : 'inherit',
+                fontWeight: activeView === 'rank' ? 'bold' : 'normal',
+              }}
+            />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton 
+            onClick={() => handleViewChange('graph')}
+            selected={activeView === 'graph'}
+            sx={{
+              '&.Mui-selected': {
+                background: 'rgba(26, 35, 126, 0.1)',
+                '&:hover': {
+                  background: 'rgba(26, 35, 126, 0.2)',
+                },
+              },
+            }}
+          >
+            <ListItemIcon>
+              <ShowChartIcon color={activeView === 'graph' ? 'primary' : 'inherit'} />
+            </ListItemIcon>
+            <ListItemText 
+              primary="그래프" 
+              primaryTypographyProps={{
+                color: activeView === 'graph' ? 'primary' : 'inherit',
+                fontWeight: activeView === 'graph' ? 'bold' : 'normal',
+              }}
+            />
+          </ListItemButton>
+        </ListItem>
+      </List>
+    </Drawer>
+  );
 
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          p: 4, 
-          mb: 4,
-          borderRadius: 3,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          background: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(10px)',
-          transition: 'transform 0.3s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-5px)'
-          }
-        }}
-      >
-        <Stepper 
-          activeStep={activeStep} 
-          sx={{ 
-            mb: 4,
-            '& .MuiStepLabel-label': {
-              fontWeight: 600,
-              color: '#1a237e'
-            },
-            '& .MuiStepIcon-root': {
-              color: '#1a237e'
-            },
-            '& .MuiStepIcon-root.Mui-active': {
-              color: '#3949ab'
-            },
-            '& .MuiStepIcon-root.Mui-completed': {
-              color: '#3949ab'
-            }
-          }}
-        >
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-
-        <Box component="form" onSubmit={handleSubmit}>
-          {activeStep === 0 ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="비밀번호"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                fullWidth
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    },
-                    '&.Mui-focused': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }
-                  }
-                }}
-              />
-              <Button
-                variant="contained"
-                onClick={handleNext}
-                sx={{ 
-                  minWidth: 120,
-                  borderRadius: 2,
-                  py: 1.5,
-                  background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-                  boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
-                    background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
-                  }
-                }}
-              >
-                다음
-              </Button>
-            </Box>
-          ) : activeStep === 1 ? (
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <TextField
-                label="모의고사 이름"
-                value={examInfo.exam_name}
-                onChange={(e) => setExamInfo({ ...examInfo, exam_name: e.target.value })}
-                required
-                fullWidth
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    },
-                    '&.Mui-focused': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }
-                  }
-                }}
-              />
-              <Box sx={{ display: 'flex', gap: 2, mt: 2, width: '100%' }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleBack}
-                  sx={{ 
-                    minWidth: 120,
-                    borderRadius: 2,
-                    py: 1.5,
-                    borderColor: '#1a237e',
-                    color: '#1a237e',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      borderColor: '#0d1757',
-                      backgroundColor: 'rgba(26, 35, 126, 0.04)',
-                      boxShadow: '0 4px 12px rgba(26, 35, 126, 0.1)'
-                    }
-                  }}
-                >
-                  이전
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleNext}
-                  sx={{ 
-                    minWidth: 120,
-                    borderRadius: 2,
-                    py: 1.5,
-                    background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-                    boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
-                      background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
-                    }
-                  }}
-                >
-                  다음
-                </Button>
-              </Box>
-            </Box>
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+  const renderContent = () => {
+    if (!isMobile) {
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Box>
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: 4, 
+                mb: 4,
+                borderRadius: 3,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                background: 'rgba(255, 255, 255, 0.9)',
+                backdropFilter: 'blur(10px)',
+                transition: 'transform 0.3s ease-in-out',
+                '&:hover': {
+                  transform: 'translateY(-5px)'
+                }
+              }}
+            >
               <Typography 
                 variant="h6" 
                 gutterBottom
@@ -573,394 +516,1249 @@ function App() {
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   fontWeight: 'bold',
-                  mb: 2
+                  mb: 3
                 }}
               >
-                {examInfo.exam_name} {examInfo.round}회차 점수 입력
+                점수 등록
               </Typography>
-              {STUDENT_LIST.map((student) => (
-                <TextField
-                  key={student}
-                  label={`${student}의 점수`}
-                  type="number"
-                  value={studentScores[student] || ''}
-                  onChange={(e) => {
-                    const value = e.target.value === '' ? '' : parseInt(e.target.value);
-                    if (value === '' || (value >= 0 && value <= 100)) {
-                      setStudentScores({ ...studentScores, [student]: value });
+              <Stepper 
+                activeStep={activeStep} 
+                sx={{ 
+                  mb: 4,
+                  '& .MuiStepLabel-label': {
+                    fontWeight: 600,
+                    color: '#1a237e'
+                  },
+                  '& .MuiStepIcon-root': {
+                    color: '#1a237e'
+                  },
+                  '& .MuiStepIcon-root.Mui-active': {
+                    color: '#3949ab'
+                  },
+                  '& .MuiStepIcon-root.Mui-completed': {
+                    color: '#3949ab'
+                  }
+                }}
+              >
+                {steps.map((label) => (
+                  <Step key={label}>
+                    <StepLabel>{label}</StepLabel>
+                  </Step>
+                ))}
+              </Stepper>
+
+              <Box component="form" onSubmit={handleSubmit}>
+                {activeStep === 0 ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <TextField
+                      label="비밀번호"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      fullWidth
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          },
+                          '&.Mui-focused': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={handleNext}
+                      sx={{ 
+                        minWidth: 120,
+                        borderRadius: 2,
+                        py: 1.5,
+                        background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                        boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
+                          background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
+                        }
+                      }}
+                    >
+                      다음
+                    </Button>
+                  </Box>
+                ) : activeStep === 1 ? (
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    <TextField
+                      label="모의고사 이름"
+                      value={examInfo.exam_name}
+                      onChange={(e) => setExamInfo({ ...examInfo, exam_name: e.target.value })}
+                      required
+                      fullWidth
+                      sx={{ 
+                        mb: 2,
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          },
+                          '&.Mui-focused': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          }
+                        }
+                      }}
+                    />
+                    <Box sx={{ display: 'flex', gap: 2, mt: 2, width: '100%' }}>
+                      <Button
+                        variant="outlined"
+                        onClick={handleBack}
+                        sx={{ 
+                          minWidth: 120,
+                          borderRadius: 2,
+                          py: 1.5,
+                          borderColor: '#1a237e',
+                          color: '#1a237e',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            borderColor: '#0d1757',
+                            backgroundColor: 'rgba(26, 35, 126, 0.04)',
+                            boxShadow: '0 4px 12px rgba(26, 35, 126, 0.1)'
+                          }
+                        }}
+                      >
+                        이전
+                      </Button>
+                      <Button
+                        variant="contained"
+                        onClick={handleNext}
+                        sx={{ 
+                          minWidth: 120,
+                          borderRadius: 2,
+                          py: 1.5,
+                          background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                          boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
+                            background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
+                          }
+                        }}
+                      >
+                        다음
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Typography 
+                      variant="h6" 
+                      gutterBottom
+                      sx={{ 
+                        background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                        backgroundClip: 'text',
+                        textFillColor: 'transparent',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        fontWeight: 'bold',
+                        mb: 2
+                      }}
+                    >
+                      {examInfo.exam_name} {examInfo.round}회차 점수 입력
+                    </Typography>
+                    {STUDENT_LIST.map((student) => (
+                      <TextField
+                        key={student}
+                        label={`${student}의 점수`}
+                        type="number"
+                        value={studentScores[student] || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? '' : parseInt(e.target.value);
+                          if (value === '' || (value >= 0 && value <= 100)) {
+                            setStudentScores({ ...studentScores, [student]: value });
+                          }
+                        }}
+                        inputProps={{ min: 0, max: 100, step: 1 }}
+                        placeholder="점수를 입력하세요 (미응시시 비워두세요)"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                            },
+                            '&.Mui-focused': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                            }
+                          }
+                        }}
+                      />
+                    ))}
+                    <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={handleBack}
+                        sx={{ 
+                          minWidth: 120,
+                          borderRadius: 2,
+                          py: 1.5,
+                          borderColor: '#1a237e',
+                          color: '#1a237e',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            borderColor: '#0d1757',
+                            backgroundColor: 'rgba(26, 35, 126, 0.04)',
+                            boxShadow: '0 4px 12px rgba(26, 35, 126, 0.1)'
+                          }
+                        }}
+                      >
+                        이전
+                      </Button>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        sx={{ 
+                          minWidth: 120,
+                          borderRadius: 2,
+                          py: 1.5,
+                          background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                          boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
+                            background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
+                          }
+                        }}
+                      >
+                        저장
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
+            <Box sx={{ flex: 1 }}>
+              <Paper 
+                elevation={3} 
+                sx={{ 
+                  p: 4,
+                  mb: 4,
+                  borderRadius: 3,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'transform 0.3s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-5px)'
+                  }
+                }}
+              >
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{ 
+                    background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                    backgroundClip: 'text',
+                    textFillColor: 'transparent',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontWeight: 'bold',
+                    mb: 3
+                  }}
+                >
+                  회차별 순위
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <FormControl 
+                    sx={{ 
+                      minWidth: 200,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }
+                      }
+                    }}
+                  >
+                    <Select
+                      value={selectedRound}
+                      onChange={(e) => setSelectedRound(e.target.value as number | 'all')}
+                      displayEmpty
+                      sx={{
+                        '& .MuiSelect-select': {
+                          py: 1.5
+                        }
+                      }}
+                    >
+                      <MenuItem value="all">전체 회차</MenuItem>
+                      {Array.from(new Set(exams.map(exam => exam.round)))
+                        .sort((a, b) => a - b)
+                        .map(round => (
+                          <MenuItem key={round} value={round}>
+                            {round}회차
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+                <TableContainer 
+                  sx={{ 
+                    borderRadius: 2, 
+                    overflow: 'hidden',
+                    '& .MuiTable-root': {
+                      minWidth: 600, // 최소 너비 설정
+                    },
+                    '& .MuiTableCell-root': {
+                      whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
+                      px: { xs: 1, sm: 2 }, // 모바일에서 패딩 줄임
+                      py: { xs: 1, sm: 2 }, // 모바일에서 패딩 줄임
+                    },
+                    '& .MuiTableHead-root .MuiTableCell-root': {
+                      position: 'sticky', // 헤더 고정
+                      top: 0,
+                      zIndex: 1,
+                      background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                    },
+                    '& .MuiTableBody-root .MuiTableCell-root': {
+                      fontSize: { xs: '0.75rem', sm: '1rem' }, // 모바일에서 폰트 크기 줄임
                     }
                   }}
-                  inputProps={{ min: 0, max: 100, step: 1 }}
-                  placeholder="점수를 입력하세요 (미응시시 비워두세요)"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
+                >
+                  <Box sx={{ overflowX: 'auto' }}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell 
+                            sx={{ 
+                              fontWeight: 'bold',
+                              background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                              color: 'white',
+                              borderBottom: 'none',
+                              py: 2,
+                              width: '15%'
+                            }}
+                          >
+                            회차
+                          </TableCell>
+                          <TableCell 
+                            sx={{ 
+                              fontWeight: 'bold',
+                              background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                              color: 'white',
+                              borderBottom: 'none',
+                              py: 2,
+                              width: '25%'
+                            }}
+                          >
+                            모의고사
+                          </TableCell>
+                          {STUDENT_LIST.map((student, index) => (
+                            <TableCell 
+                              key={student}
+                              sx={{ 
+                                fontWeight: 'bold',
+                                background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                                color: 'white',
+                                borderBottom: 'none',
+                                py: 2,
+                                width: `${60 / STUDENT_LIST.length}%`
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 1,
+                                  p: 1,
+                                  borderRadius: 1,
+                                  background: `hsl(${index * 360 / STUDENT_LIST.length}, 70%, 40%)`,
+                                  transition: 'all 0.3s ease',
+                                  '&:hover': {
+                                    background: `hsl(${index * 360 / STUDENT_LIST.length}, 70%, 35%)`
+                                  }
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    color: 'white',
+                                    fontWeight: 'bold'
+                                  }}
+                                >
+                                  {student}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {getRankingsByRound().map(({ round, examName, rankings }) => (
+                          <TableRow 
+                            key={round}
+                            sx={{ 
+                              '&:nth-of-type(odd)': { 
+                                backgroundColor: 'rgba(0, 0, 0, 0.02)' 
+                              },
+                              '&:hover': {
+                                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                                transition: 'background-color 0.3s ease'
+                              }
+                            }}
+                          >
+                            <TableCell 
+                              sx={{ 
+                                fontWeight: 'bold',
+                                color: '#1a237e',
+                                borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+                                py: 2
+                              }}
+                            >
+                              {round}회차
+                            </TableCell>
+                            <TableCell
+                              sx={{
+                                borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+                                py: 2
+                              }}
+                            >
+                              {examName}
+                            </TableCell>
+                            {STUDENT_LIST.map((student, index) => {
+                              const studentRanking = rankings.find(r => r.student.student_name === student);
+                              return (
+                                <TableCell 
+                                  key={student}
+                                  sx={{
+                                    borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+                                    py: 2
+                                  }}
+                                >
+                                  {studentRanking ? (
+                                    <Box 
+                                      sx={{ 
+                                        display: 'flex', 
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: 0.5
+                                      }}
+                                    >
+                                      <Typography 
+                                        sx={{ 
+                                          fontWeight: 'bold',
+                                          fontSize: '1.1rem',
+                                          color: studentRanking.rank === 1 
+                                            ? '#e53935'  // 1위: 빨간색
+                                            : studentRanking.rank === 2
+                                            ? '#fb8c00'  // 2위: 주황색
+                                            : studentRanking.rank === 3
+                                            ? '#43a047'  // 3위: 초록색
+                                            : '#1e88e5'  // 4위: 파란색
+                                        }}
+                                      >
+                                        {studentRanking.rank}위
+                                      </Typography>
+                                      <Typography 
+                                        sx={{ 
+                                          color: '#666',
+                                          fontWeight: 500,
+                                          fontSize: '0.9rem'
+                                        }}
+                                      >
+                                        {studentRanking.score}점
+                                      </Typography>
+                                    </Box>
+                                  ) : (
+                                    <Typography 
+                                      sx={{ 
+                                        color: '#999',
+                                        textAlign: 'center'
+                                      }}
+                                    >
+                                      미응시
+                                    </Typography>
+                                  )}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                </TableContainer>
+              </Paper>
+            </Box>
+
+            <Box sx={{ flex: 1 }}>
+              <Paper 
+                elevation={3} 
+                sx={{ 
+                  p: 4,
+                  borderRadius: 3,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'transform 0.3s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-5px)'
+                  }
+                }}
+              >
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{ 
+                    background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                    backgroundClip: 'text',
+                    textFillColor: 'transparent',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontWeight: 'bold',
+                    mb: 3
+                  }}
+                >
+                  성적 추이 그래프
+                </Typography>
+                <Box 
+                  sx={{ 
+                    mb: 3, 
+                    display: 'flex', 
+                    gap: 1, 
+                    flexWrap: 'wrap',
+                    '& .MuiButton-root': {
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      transition: 'all 0.3s ease'
+                    }
+                  }}
+                >
+                  {STUDENT_LIST.map((student) => (
+                    <Button
+                      key={student}
+                      variant={selectedStudents[student] ? "contained" : "outlined"}
+                      onClick={() => toggleStudent(student)}
+                      size="small"
+                      sx={{
+                        minWidth: 'auto',
+                        px: 2,
+                        py: 1,
+                        borderRadius: 2, 
+                        backgroundColor: selectedStudents[student] 
+                          ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`
+                          : 'transparent',
+                        borderColor: `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`,
+                        color: selectedStudents[student] ? 'white' : `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`,
+                        boxShadow: selectedStudents[student] 
+                          ? `0 4px 12px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.3)`
+                          : 'none',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          backgroundColor: selectedStudents[student]
+                            ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 40%)`
+                            : `hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.1)`,
+                          boxShadow: selectedStudents[student]
+                            ? `0 6px 16px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.4)`
+                            : `0 4px 12px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.1)`
+                        }
+                      }}
+                    >
+                      {student}
+                    </Button>
+                  ))}
+                </Box>
+                <GraphComponent selectedStudents={selectedStudents} scores={scores} />
+              </Paper>
+            </Box>
+          </Box>
+        </Box>
+      );
+    }
+
+    // 모바일에서는 기존처럼 하나씩 보여주기
+    switch (activeView) {
+      case 'score':
+        return (
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 4, 
+              mb: 4,
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              transition: 'transform 0.3s ease-in-out',
+              '&:hover': {
+                transform: 'translateY(-5px)'
+              }
+            }}
+          >
+            <Stepper 
+              activeStep={activeStep} 
+              sx={{ 
+                mb: 4,
+                '& .MuiStepLabel-label': {
+                  fontWeight: 600,
+                  color: '#1a237e'
+                },
+                '& .MuiStepIcon-root': {
+                  color: '#1a237e'
+                },
+                '& .MuiStepIcon-root.Mui-active': {
+                  color: '#3949ab'
+                },
+                '& .MuiStepIcon-root.Mui-completed': {
+                  color: '#3949ab'
+                }
+              }}
+            >
+              {steps.map((label) => (
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+
+            <Box component="form" onSubmit={handleSubmit}>
+              {activeStep === 0 ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField
+                    label="비밀번호"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        },
+                        '&.Mui-focused': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={handleNext}
+                    sx={{ 
+                      minWidth: 120,
                       borderRadius: 2,
+                      py: 1.5,
+                      background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                      boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
                       transition: 'all 0.3s ease',
                       '&:hover': {
                         transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                      },
-                      '&.Mui-focused': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
+                        background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
                       }
-                    }
-                  }}
-                />
-              ))}
-              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleBack}
-                  sx={{ 
-                    minWidth: 120,
-                    borderRadius: 2,
-                    py: 1.5,
-                    borderColor: '#1a237e',
-                    color: '#1a237e',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      borderColor: '#0d1757',
-                      backgroundColor: 'rgba(26, 35, 126, 0.04)',
-                      boxShadow: '0 4px 12px rgba(26, 35, 126, 0.1)'
-                    }
-                  }}
-                >
-                  이전
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  sx={{ 
-                    minWidth: 120,
-                    borderRadius: 2,
-                    py: 1.5,
-                    background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-                    boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
-                      background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
-                    }
-                  }}
-                >
-                  저장
-                </Button>
-              </Box>
+                    }}
+                  >
+                    다음
+                  </Button>
+                </Box>
+              ) : activeStep === 1 ? (
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <TextField
+                    label="모의고사 이름"
+                    value={examInfo.exam_name}
+                    onChange={(e) => setExamInfo({ ...examInfo, exam_name: e.target.value })}
+                    required
+                    fullWidth
+                    sx={{ 
+                      mb: 2,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        },
+                        '&.Mui-focused': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }
+                      }
+                    }}
+                  />
+                  <Box sx={{ display: 'flex', gap: 2, mt: 2, width: '100%' }}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleBack}
+                      sx={{ 
+                        minWidth: 120,
+                        borderRadius: 2,
+                        py: 1.5,
+                        borderColor: '#1a237e',
+                        color: '#1a237e',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          borderColor: '#0d1757',
+                          backgroundColor: 'rgba(26, 35, 126, 0.04)',
+                          boxShadow: '0 4px 12px rgba(26, 35, 126, 0.1)'
+                        }
+                      }}
+                    >
+                      이전
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={handleNext}
+                      sx={{ 
+                        minWidth: 120,
+                        borderRadius: 2,
+                        py: 1.5,
+                        background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                        boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
+                          background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
+                        }
+                      }}
+                    >
+                      다음
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Typography 
+                    variant="h6" 
+                    gutterBottom
+                    sx={{ 
+                      background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                      backgroundClip: 'text',
+                      textFillColor: 'transparent',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      fontWeight: 'bold',
+                      mb: 2
+                    }}
+                  >
+                    {examInfo.exam_name} {examInfo.round}회차 점수 입력
+                  </Typography>
+                  {STUDENT_LIST.map((student) => (
+                    <TextField
+                      key={student}
+                      label={`${student}의 점수`}
+                      type="number"
+                      value={studentScores[student] || ''}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? '' : parseInt(e.target.value);
+                        if (value === '' || (value >= 0 && value <= 100)) {
+                          setStudentScores({ ...studentScores, [student]: value });
+                        }
+                      }}
+                      inputProps={{ min: 0, max: 100, step: 1 }}
+                      placeholder="점수를 입력하세요 (미응시시 비워두세요)"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          },
+                          '&.Mui-focused': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          }
+                        }
+                      }}
+                    />
+                  ))}
+                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleBack}
+                      sx={{ 
+                        minWidth: 120,
+                        borderRadius: 2,
+                        py: 1.5,
+                        borderColor: '#1a237e',
+                        color: '#1a237e',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          borderColor: '#0d1757',
+                          backgroundColor: 'rgba(26, 35, 126, 0.04)',
+                          boxShadow: '0 4px 12px rgba(26, 35, 126, 0.1)'
+                        }
+                      }}
+                    >
+                      이전
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      sx={{ 
+                        minWidth: 120,
+                        borderRadius: 2,
+                        py: 1.5,
+                        background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                        boxShadow: '0 4px 12px rgba(26, 35, 126, 0.3)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 16px rgba(26, 35, 126, 0.4)',
+                          background: 'linear-gradient(45deg, #0d1757 30%, #1a237e 90%)'
+                        }
+                      }}
+                    >
+                      저장
+                    </Button>
+                  </Box>
+                </Box>
+              )}
             </Box>
-          )}
-        </Box>
-      </Paper>
+          </Paper>
+        );
+      case 'rank':
+        return (
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 4,
+              mb: 4,
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              transition: 'transform 0.3s ease-in-out',
+              '&:hover': {
+                transform: 'translateY(-5px)'
+              }
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                  backgroundClip: 'text',
+                  textFillColor: 'transparent',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  fontWeight: 'bold'
+                }}
+              >
+                회차별 순위
+              </Typography>
+              <FormControl 
+                sx={{ 
+                  minWidth: 200,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }
+                  }
+                }}
+              >
+                <Select
+                  value={selectedRound}
+                  onChange={(e) => setSelectedRound(e.target.value as number | 'all')}
+                  displayEmpty
+                  sx={{
+                    '& .MuiSelect-select': {
+                      py: 1.5
+                    }
+                  }}
+                >
+                  <MenuItem value="all">전체 회차</MenuItem>
+                  {Array.from(new Set(exams.map(exam => exam.round)))
+                    .sort((a, b) => a - b)
+                    .map(round => (
+                      <MenuItem key={round} value={round}>
+                        {round}회차
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+            </Box>
+            <TableContainer 
+              sx={{ 
+                borderRadius: 2, 
+                overflow: 'hidden',
+                '& .MuiTable-root': {
+                  minWidth: 600, // 최소 너비 설정
+                },
+                '& .MuiTableCell-root': {
+                  whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
+                  px: { xs: 1, sm: 2 }, // 모바일에서 패딩 줄임
+                  py: { xs: 1, sm: 2 }, // 모바일에서 패딩 줄임
+                },
+                '& .MuiTableHead-root .MuiTableCell-root': {
+                  position: 'sticky', // 헤더 고정
+                  top: 0,
+                  zIndex: 1,
+                  background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                },
+                '& .MuiTableBody-root .MuiTableCell-root': {
+                  fontSize: { xs: '0.75rem', sm: '1rem' }, // 모바일에서 폰트 크기 줄임
+                }
+              }}
+            >
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell 
+                        sx={{ 
+                          fontWeight: 'bold',
+                          background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                          color: 'white',
+                          borderBottom: 'none',
+                          py: 2,
+                          width: '15%'
+                        }}
+                      >
+                        회차
+                      </TableCell>
+                      <TableCell 
+                        sx={{ 
+                          fontWeight: 'bold',
+                          background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                          color: 'white',
+                          borderBottom: 'none',
+                          py: 2,
+                          width: '25%'
+                        }}
+                      >
+                        모의고사
+                      </TableCell>
+                      {STUDENT_LIST.map((student, index) => (
+                        <TableCell 
+                          key={student}
+                          sx={{ 
+                            fontWeight: 'bold',
+                            background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                            color: 'white',
+                            borderBottom: 'none',
+                            py: 2,
+                            width: `${60 / STUDENT_LIST.length}%`
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 1,
+                              p: 1,
+                              borderRadius: 1,
+                              background: `hsl(${index * 360 / STUDENT_LIST.length}, 70%, 40%)`,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                background: `hsl(${index * 360 / STUDENT_LIST.length}, 70%, 35%)`
+                              }
+                            }}
+                          >
+                            <Typography
+                              sx={{
+                                color: 'white',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              {student}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {getRankingsByRound().map(({ round, examName, rankings }) => (
+                      <TableRow 
+                        key={round}
+                        sx={{ 
+                          '&:nth-of-type(odd)': { 
+                            backgroundColor: 'rgba(0, 0, 0, 0.02)' 
+                          },
+                          '&:hover': {
+                            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                            transition: 'background-color 0.3s ease'
+                          }
+                        }}
+                      >
+                        <TableCell 
+                          sx={{ 
+                            fontWeight: 'bold',
+                            color: '#1a237e',
+                            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+                            py: 2
+                          }}
+                        >
+                          {round}회차
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+                            py: 2
+                          }}
+                        >
+                          {examName}
+                        </TableCell>
+                        {STUDENT_LIST.map((student, index) => {
+                          const studentRanking = rankings.find(r => r.student.student_name === student);
+                          return (
+                            <TableCell 
+                              key={student}
+                              sx={{
+                                borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+                                py: 2
+                              }}
+                            >
+                              {studentRanking ? (
+                                <Box 
+                                  sx={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: 0.5
+                                  }}
+                                >
+                                  <Typography 
+                                    sx={{ 
+                                      fontWeight: 'bold',
+                                      fontSize: '1.1rem',
+                                      color: studentRanking.rank === 1 
+                                        ? '#e53935'  // 1위: 빨간색
+                                        : studentRanking.rank === 2
+                                        ? '#fb8c00'  // 2위: 주황색
+                                        : studentRanking.rank === 3
+                                        ? '#43a047'  // 3위: 초록색
+                                        : '#1e88e5'  // 4위: 파란색
+                                    }}
+                                  >
+                                    {studentRanking.rank}위
+                                  </Typography>
+                                  <Typography 
+                                    sx={{ 
+                                      color: '#666',
+                                      fontWeight: 500,
+                                      fontSize: '0.9rem'
+                                    }}
+                                  >
+                                    {studentRanking.score}점
+                                  </Typography>
+                                </Box>
+                              ) : (
+                                <Typography 
+                                  sx={{ 
+                                    color: '#999',
+                                    textAlign: 'center'
+                                  }}
+                                >
+                                  미응시
+                                </Typography>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            </TableContainer>
+          </Paper>
+        );
+      case 'graph':
+        return (
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 4,
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              transition: 'transform 0.3s ease-in-out',
+              '&:hover': {
+                transform: 'translateY(-5px)'
+              }
+            }}
+          >
+            <Typography 
+              variant="h6" 
+              gutterBottom
+              sx={{ 
+                background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+                backgroundClip: 'text',
+                textFillColor: 'transparent',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 'bold',
+                mb: 3
+              }}
+            >
+              성적 추이 그래프
+            </Typography>
+            <Box 
+              sx={{ 
+                mb: 3, 
+                display: 'flex', 
+                gap: 1, 
+                flexWrap: 'wrap',
+                '& .MuiButton-root': {
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  transition: 'all 0.3s ease'
+                }
+              }}
+            >
+              {STUDENT_LIST.map((student) => (
+                <Button
+                  key={student}
+                  variant={selectedStudents[student] ? "contained" : "outlined"}
+                  onClick={() => toggleStudent(student)}
+                  size="small"
+                  sx={{
+                    minWidth: 'auto',
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2,
+                    backgroundColor: selectedStudents[student] 
+                      ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`
+                      : 'transparent',
+                    borderColor: `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`,
+                    color: selectedStudents[student] ? 'white' : `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`,
+                    boxShadow: selectedStudents[student] 
+                      ? `0 4px 12px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.3)`
+                      : 'none',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      backgroundColor: selectedStudents[student]
+                        ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 40%)`
+                        : `hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.1)`,
+                      boxShadow: selectedStudents[student]
+                        ? `0 6px 16px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.4)`
+                        : `0 4px 12px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.1)`
+                    }
+                  }}
+                >
+                  {student}
+                </Button>
+              ))}
+            </Box>
+            <GraphComponent selectedStudents={selectedStudents} scores={scores} />
+          </Paper>
+        );
+      default:
+        return null;
+    }
+  };
 
-      <Paper 
-        elevation={3} 
+  return (
+    <Box sx={{ display: 'flex', minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%)' }}>
+      <AppBar 
+        position="fixed" 
         sx={{ 
-          p: 4,
-          mb: 4,
-          borderRadius: 3,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          background: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(10px)',
-          transition: 'transform 0.3s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-5px)'
-          }
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
         }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Toolbar>
+          {isMobile && (
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
           <Typography 
             variant="h6" 
+            noWrap 
+            component="div"
             sx={{ 
-              background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
+              fontWeight: 800,
+              background: 'linear-gradient(45deg, #ffffff 30%, #e3f2fd 90%)',
               backgroundClip: 'text',
               textFillColor: 'transparent',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              fontWeight: 'bold'
             }}
           >
-            회차별 순위
+            모의고사 성적 추적
           </Typography>
-          <FormControl 
+        </Toolbar>
+      </AppBar>
+      
+      {isMobile && renderDrawer()}
+      
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: '100%',
+          mt: '64px'
+        }}
+      >
+        {error && (
+          <Alert 
+            severity="error" 
             sx={{ 
-              minWidth: 200,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                background: 'rgba(255, 255, 255, 0.9)',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              mb: 3,
+              borderRadius: 3,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              animation: 'slideIn 0.3s ease-out',
+              '@keyframes slideIn': {
+                '0%': {
+                  transform: 'translateY(-20px)',
+                  opacity: 0
+                },
+                '100%': {
+                  transform: 'translateY(0)',
+                  opacity: 1
                 }
               }
             }}
           >
-            <Select
-              value={selectedRound}
-              onChange={(e) => setSelectedRound(e.target.value as number | 'all')}
-              displayEmpty
-              sx={{
-                '& .MuiSelect-select': {
-                  py: 1.5
-                }
-              }}
-            >
-              <MenuItem value="all">전체 회차</MenuItem>
-              {Array.from(new Set(exams.map(exam => exam.round)))
-                .sort((a, b) => a - b)
-                .map(round => (
-                  <MenuItem key={round} value={round}>
-                    {round}회차
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-        </Box>
-        <TableContainer sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell 
-                  sx={{ 
-                    fontWeight: 'bold',
-                    background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-                    color: 'white',
-                    borderBottom: 'none',
-                    py: 2,
-                    width: '15%'
-                  }}
-                >
-                  회차
-                </TableCell>
-                <TableCell 
-                  sx={{ 
-                    fontWeight: 'bold',
-                    background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-                    color: 'white',
-                    borderBottom: 'none',
-                    py: 2,
-                    width: '25%'
-                  }}
-                >
-                  모의고사
-                </TableCell>
-                {STUDENT_LIST.map((student, index) => (
-                  <TableCell 
-                    key={student}
-                    sx={{ 
-                      fontWeight: 'bold',
-                      background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-                      color: 'white',
-                      borderBottom: 'none',
-                      py: 2,
-                      width: `${60 / STUDENT_LIST.length}%`
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 1,
-                        p: 1,
-                        borderRadius: 1,
-                        background: `hsl(${index * 360 / STUDENT_LIST.length}, 70%, 40%)`,
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          background: `hsl(${index * 360 / STUDENT_LIST.length}, 70%, 35%)`
-                        }
-                      }}
-                    >
-                      <Typography
-                        sx={{
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        {student}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {getRankingsByRound().map(({ round, examName, rankings }) => (
-                <TableRow 
-                  key={round}
-                  sx={{ 
-                    '&:nth-of-type(odd)': { 
-                      backgroundColor: 'rgba(0, 0, 0, 0.02)' 
-                    },
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      transition: 'background-color 0.3s ease'
-                    }
-                  }}
-                >
-                  <TableCell 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      color: '#1a237e',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-                      py: 2
-                    }}
-                  >
-                    {round}회차
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-                      py: 2
-                    }}
-                  >
-                    {examName}
-                  </TableCell>
-                  {STUDENT_LIST.map((student, index) => {
-                    const studentRanking = rankings.find(r => r.student.student_name === student);
-                    return (
-                      <TableCell 
-                        key={student}
-                        sx={{
-                          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-                          py: 2
-                        }}
-                      >
-                        {studentRanking ? (
-                          <Box 
-                            sx={{ 
-                              display: 'flex', 
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: 0.5
-                            }}
-                          >
-                            <Typography 
-                              sx={{ 
-                                fontWeight: 'bold',
-                                fontSize: '1.1rem',
-                                color: studentRanking.rank === 1 
-                                  ? '#e53935'  // 1위: 빨간색
-                                  : studentRanking.rank === 2
-                                  ? '#fb8c00'  // 2위: 주황색
-                                  : studentRanking.rank === 3
-                                  ? '#43a047'  // 3위: 초록색
-                                  : '#1e88e5'  // 4위: 파란색
-                              }}
-                            >
-                              {studentRanking.rank}위
-                            </Typography>
-                            <Typography 
-                              sx={{ 
-                                color: '#666',
-                                fontWeight: 500,
-                                fontSize: '0.9rem'
-                              }}
-                            >
-                              {studentRanking.score}점
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <Typography 
-                            sx={{ 
-                              color: '#999',
-                              textAlign: 'center'
-                            }}
-                          >
-                            미응시
-                          </Typography>
-                        )}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          p: 4,
-          borderRadius: 3,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          background: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(10px)',
-          transition: 'transform 0.3s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-5px)'
-          }
-        }}
-      >
-        <Typography 
-          variant="h6" 
-          gutterBottom
-          sx={{ 
-            background: 'linear-gradient(45deg, #1a237e 30%, #3949ab 90%)',
-            backgroundClip: 'text',
-            textFillColor: 'transparent',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            fontWeight: 'bold',
-            mb: 3
-          }}
-        >
-          성적 추이 그래프
-        </Typography>
-        <Box 
-          sx={{ 
-            mb: 3, 
-            display: 'flex', 
-            gap: 1, 
-            flexWrap: 'wrap',
-            '& .MuiButton-root': {
-              textTransform: 'none',
-              fontWeight: 500,
-              transition: 'all 0.3s ease'
-            }
-          }}
-        >
-          {STUDENT_LIST.map((student) => (
-            <Button
-              key={student}
-              variant={selectedStudents[student] ? "contained" : "outlined"}
-              onClick={() => toggleStudent(student)}
-              size="small"
-              sx={{
-                minWidth: 'auto',
-                px: 2,
-                py: 1,
-                borderRadius: 2,
-                backgroundColor: selectedStudents[student] 
-                  ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`
-                  : 'transparent',
-                borderColor: `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`,
-                color: selectedStudents[student] ? 'white' : `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%)`,
-                boxShadow: selectedStudents[student] 
-                  ? `0 4px 12px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.3)`
-                  : 'none',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  backgroundColor: selectedStudents[student]
-                    ? `hsl(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 40%)`
-                    : `hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.1)`,
-                  boxShadow: selectedStudents[student]
-                    ? `0 6px 16px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.4)`
-                    : `0 4px 12px hsla(${STUDENT_LIST.indexOf(student) * 360 / STUDENT_LIST.length}, 70%, 50%, 0.1)`
-                }
-              }}
-            >
-              {student}
-            </Button>
-          ))}
-        </Box>
-        <GraphComponent selectedStudents={selectedStudents} scores={scores} />
-      </Paper>
-    </Container>
+            {error}
+          </Alert>
+        )}
+        
+        {renderContent()}
+      </Box>
+    </Box>
   );
 }
 
