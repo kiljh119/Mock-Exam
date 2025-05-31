@@ -490,7 +490,6 @@ function App() {
   const [selectedRound, setSelectedRound] = useState<number | 'all'>('all');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [schedules, setSchedules] = useState<ExamSchedule[]>([]);
   const [participants, setParticipants] = useState<ExamParticipant[]>([]);
   const [newSchedule, setNewSchedule] = useState<{
@@ -526,13 +525,6 @@ function App() {
       setDeferredPrompt(e);
       setShowInstallPrompt(true);
     });
-  }, []);
-
-  useEffect(() => {
-    // 알림 권한 확인
-    if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-    }
   }, []);
 
   const getScoresWithDetails = useCallback(() => {
@@ -959,77 +951,6 @@ function App() {
     setShowInstallPrompt(false);
   };
 
-  const requestNotificationPermission = async () => {
-    try {
-      // 서비스 워커 등록
-      if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
-        console.log('Service Worker 등록 성공:', registration);
-      }
-
-      // 알림 권한 요청
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      
-      if (permission === 'granted') {
-        // 알림 권한이 허용되면 서비스 워커가 준비될 때까지 대기
-        const registration = await navigator.serviceWorker.ready;
-        
-        // 구독 정보 가져오기
-        const subscription = await registration.pushManager.getSubscription();
-        
-        if (!subscription) {
-          // 구독이 없으면 새로 생성
-          const newSubscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: process.env.REACT_APP_VAPID_PUBLIC_KEY
-          });
-          
-          // 구독 정보를 서버에 저장
-          const { error } = await supabase
-            .from('push_subscriptions')
-            .insert({
-              subscription: newSubscription,
-              user_agent: navigator.userAgent
-            });
-            
-          if (error) throw error;
-        }
-        
-        console.log('알림 권한이 허용되었습니다.');
-      }
-    } catch (error) {
-      console.error('알림 권한 요청 중 오류 발생:', error);
-      setError('알림 권한을 요청하는 중 오류가 발생했습니다.');
-    }
-  };
-
-  const sendNotification = async (title: string, body: string) => {
-    try {
-      const { data: subscriptions, error } = await supabase
-        .from('push_subscriptions')
-        .select('subscription');
-
-      if (error) throw error;
-
-      // Supabase Edge Function 호출
-      const { error: notificationError } = await supabase.functions.invoke('send-notification', {
-        body: {
-          subscriptions,
-          payload: {
-            title,
-            body,
-          },
-        },
-      });
-
-      if (notificationError) throw notificationError;
-      console.log('알림 전송 성공');
-    } catch (error) {
-      console.error('알림 전송 중 오류 발생:', error);
-    }
-  };
-
   const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSchedulePasswordVerified) {
@@ -1110,20 +1031,6 @@ function App() {
           }
         }
       }
-
-      // 4. 알림 전송
-      const examDate = new Date(newSchedule.exam_date);
-      const formattedDate = examDate.toLocaleDateString('ko-KR', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long'
-      });
-      
-      await sendNotification(
-        '새로운 모의고사 일정이 등록되었습니다',
-        `${newSchedule.exam_name} - ${formattedDate}`
-      );
 
       // 저장 성공 후 상태 초기화
       setNewSchedule({
@@ -2573,7 +2480,7 @@ function App() {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            우최실
+            모의고사 성적 추적
           </Typography>
           <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
             {!isMobile && (
@@ -2587,21 +2494,7 @@ function App() {
                   }
                 }}
               >
-                일정
-              </Button>
-            )}
-            {notificationPermission !== 'granted' && (
-              <Button
-                color="inherit"
-                onClick={requestNotificationPermission}
-                sx={{ 
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                  }
-                }}
-              >
-                알림 받기
+                일정 등록
               </Button>
             )}
             {showInstallPrompt && (
