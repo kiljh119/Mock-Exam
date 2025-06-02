@@ -511,7 +511,11 @@ function App() {
     const checkMobile = () => {
       const userAgent = navigator.userAgent.toLowerCase();
       const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      const isIOS = /iphone|ipad|ipod/i.test(userAgent);
       setIsMobile(isMobileDevice);
+      if (isIOS) {
+        setShowInstallPrompt(true);
+      }
     };
     
     checkMobile();
@@ -520,11 +524,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallPrompt(true);
-    });
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
+    if (!isIOS) {
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setShowInstallPrompt(true);
+      });
+    }
   }, []);
 
   const getScoresWithDetails = useCallback(() => {
@@ -1225,25 +1232,32 @@ function App() {
         throw findError;
       }
 
+      let updatedParticipant;
       if (existingParticipant) {
         // 기존 참가자 정보가 있으면 업데이트
-        const { error: updateError } = await supabase
+        const { data, error: updateError } = await supabase
           .from('exam_participants')
           .update({ is_participating: isParticipating })
-          .eq('id', existingParticipant.id);
+          .eq('id', existingParticipant.id)
+          .select()
+          .single();
 
         if (updateError) throw updateError;
+        updatedParticipant = data;
       } else {
         // 기존 참가자 정보가 없으면 새로 생성
-        const { error: insertError } = await supabase
+        const { data, error: insertError } = await supabase
           .from('exam_participants')
           .insert({
             schedule_id: scheduleId,
             student_name: studentName,
             is_participating: isParticipating
-          });
+          })
+          .select()
+          .single();
 
         if (insertError) throw insertError;
+        updatedParticipant = data;
       }
 
       // 참가자 목록 업데이트
@@ -1262,19 +1276,24 @@ function App() {
         } else {
           // 새로운 참가자 정보 추가
           updatedParticipants.push({
-            id: Date.now(), // 임시 ID
+            id: updatedParticipant.id,
             schedule_id: scheduleId,
             student_name: studentName,
             is_participating: isParticipating,
-            created_at: new Date().toISOString()
+            created_at: updatedParticipant.created_at
           });
         }
 
         return updatedParticipants;
       });
+
+      // 성공 메시지 표시
+      setError(null);
     } catch (err) {
       console.error('Error updating participation:', err);
       setError('참가 여부를 업데이트하는 중 오류가 발생했습니다.');
+      // 에러 발생 시 데이터 새로고침
+      await fetchSchedules();
     }
   };
 
