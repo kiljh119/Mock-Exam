@@ -624,9 +624,21 @@ function App() {
   useEffect(() => {
     const subscription = supabase
       .channel('db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        console.log('데이터베이스 변경 감지, 데이터 새로고침...');
-        fetchData();
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public',
+        table: 'exam_participants'
+      }, () => {
+        console.log('참가자 정보 변경 감지, 데이터 새로고침...');
+        fetchSchedules();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public',
+        table: 'exam_schedules'
+      }, () => {
+        console.log('일정 정보 변경 감지, 데이터 새로고침...');
+        fetchSchedules();
       })
       .subscribe();
 
@@ -1289,6 +1301,9 @@ function App() {
 
       // 성공 메시지 표시
       setError(null);
+      
+      // 데이터 새로고침
+      await fetchSchedules();
     } catch (err) {
       console.error('Error updating participation:', err);
       setError('참가 여부를 업데이트하는 중 오류가 발생했습니다.');
